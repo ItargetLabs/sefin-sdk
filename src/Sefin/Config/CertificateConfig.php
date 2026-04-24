@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SefinSdk\Config;
 
+use SefinSdk\Exception\ValidationException;
+
 final class CertificateConfig
 {
     public function __construct(
@@ -20,6 +22,14 @@ final class CertificateConfig
      */
     public function toGuzzleOptions(): array
     {
+        $ext = strtolower((string) pathinfo($this->certificatePath, PATHINFO_EXTENSION));
+        if (in_array($ext, ['pfx', 'p12'], true)) {
+            throw new ValidationException(
+                'Certificado PKCS#12 (.pfx/.p12) não é suportado. '
+                . 'Forneça o certificado já extraído em PEM (SEFIN_CERT_PATH) e a chave privada em KEY/PEM (SEFIN_PRIVATE_KEY_PATH).'
+            );
+        }
+
         $options = [
             'cert' => $this->privateKeyPassword === null
                 ? $this->certificatePath

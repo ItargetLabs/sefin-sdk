@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SefinSdk\Dto;
 
 use SefinSdk\Support\XmlCompressor;
+use SefinSdk\Support\XmlNormalizer;
 
 final class NfseSubmissionRequest
 {
@@ -14,7 +15,7 @@ final class NfseSubmissionRequest
 
     public static function fromXml(string $xml): self
     {
-        return new self(XmlCompressor::encode($xml));
+        return new self(XmlCompressor::encode(XmlNormalizer::ensureUtf8($xml)));
     }
 
     /**
