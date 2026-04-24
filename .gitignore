@@ -1,0 +1,15 @@
+tests/fixtures/certs/
+*.pfx
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+.env.backup
+.env.test
+.env.production
+
+# Dependências do Composer
+/vendor/
+composer.phar
+composer.lock.bak
