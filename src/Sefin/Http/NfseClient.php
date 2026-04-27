@@ -25,12 +25,13 @@ final class NfseClient extends SefinBaseClient
 
     public function submit(NfseSubmissionRequest $request): NfseSuccessResponse
     {
-        return NfseSuccessResponse::fromArray($this->request(
+        $response = NfseSuccessResponse::fromArray($this->request(
             'POST',
             '/nfse',
             ['json' => $request->toArray()],
             201
         ));
+        return $response;
     }
 
     public function submitJudicialDecision(NfseBypassRequest $request): NfseSuccessResponse

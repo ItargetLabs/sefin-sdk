@@ -45,4 +45,19 @@ final class CertificateConfig
 
         return $options;
     }
+
+    public function getCertificatePath(): string
+    {
+        return $this->certificatePath;
+    }
+
+    public function getPrivateKeyPath(): ?string
+    {
+        return $this->privateKeyPath;
+    }
+
+    public function getPrivateKeyPassword(): ?string
+    {
+        return $this->privateKeyPassword;
+    }
 }

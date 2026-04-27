@@ -18,10 +18,15 @@ final class ProcessingMessage
      */
     public static function fromArray(array $payload): self
     {
+        // A API pode devolver chaves com casing diferente (ex.: Codigo/Descricao).
+        $codigo = (string) ($payload['codigo'] ?? $payload['Codigo'] ?? '');
+        $descricao = (string) ($payload['descricao'] ?? $payload['Descricao'] ?? '');
+        $complemento = $payload['complemento'] ?? $payload['Complemento'] ?? null;
+
         return new self(
-            codigo: (string) ($payload['codigo'] ?? ''),
-            descricao: (string) ($payload['descricao'] ?? ''),
-            complemento: isset($payload['complemento']) ? (string) $payload['complemento'] : null
+            codigo: $codigo,
+            descricao: $descricao,
+            complemento: $complemento !== null ? (string) $complemento : null
         );
     }
 }

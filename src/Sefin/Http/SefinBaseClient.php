@@ -46,10 +46,6 @@ class SefinBaseClient
         $statusCode = $response->getStatusCode();
         $body = (string) $response->getBody();
         $decoded = $body !== '' ? json_decode($body, true) : [];
-        echo '<pre>';
-        print_r($decoded);
-        echo '</pre>';
-        die;
         $payload = is_array($decoded) ? $decoded : [];
 
         if ($statusCode !== $expectedStatusCode) {
