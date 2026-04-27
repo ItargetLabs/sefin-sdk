@@ -15,6 +15,20 @@ SDK PHP para integração com a API NFS-e da SEFIN Nacional, seguindo o contrato
 
 ## Instalação
 
+### Como dependência (Composer / Packagist)
+
+O pacote está publicado no [Packagist](https://packagist.org). Em qualquer projeto PHP que use Composer, adicione a SDK com:
+
+```bash
+composer require devsitarget/sdk-sefin-nfse-php
+```
+
+Assim você passa a utilizar esta biblioteca como dependência declarada no `composer.json`, com resolução de versões e autoload gerenciados pelo Composer.
+
+### Clonando este repositório
+
+Para desenvolver ou rodar os testes a partir do código-fonte deste repositório:
+
 ```bash
 composer install
 ```
