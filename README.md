@@ -12,6 +12,7 @@ SDK PHP para integração com a API NFS-e da SEFIN Nacional, seguindo o contrato
 - Suporte a autenticação mTLS com certificado cliente
 - DTOs tipados para requests e responses
 - Utilitário para compactar/descompactar XML em `gzip + base64`
+- Geração do **DANFSe em PDF** a partir do XML da NFS-e autorizada (integração com [andrevabo/danfse-nacional](https://github.com/andrevabo/danfse-nacional))
 
 ## Instalação
 
@@ -152,6 +153,30 @@ $response = $sdk->submitNfseFromArray($payload);
 
 echo $response->chaveAcesso;
 ```
+
+## DANFSe em PDF (XML → PDF)
+
+Para gerar o documento auxiliar da NFS-e em PDF a partir do XML retornado pela SEFIN (ou de um arquivo salvo), use `DanfsePdfGenerator`. A SDK normaliza o XML quando necessário para compatibilidade com o gerador (por exemplo, ajustes no bloco `totTrib`).
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use SefinSdk\Support\DanfsePdfGenerator;
+
+require __DIR__ . '/vendor/autoload.php';
+
+$xml = file_get_contents(__DIR__ . '/nfse-autorizada.xml');
+
+$pdf = (new DanfsePdfGenerator())->generateFromXml($xml);
+
+header('Content-Type: application/pdf');
+header('Content-Disposition: attachment; filename="danfse.pdf"');
+echo $pdf;
+```
+
+Opcionalmente é possível injetar uma instância de `DanfseConfig` da biblioteca `danfse-nacional` no construtor de `DanfsePdfGenerator` para ajustes avançados de layout.
 
 ## Testes
 
