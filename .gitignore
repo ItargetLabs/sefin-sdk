@@ -1,4 +1,9 @@
-tests/fixtures/certs/
+# NFS-e de exemplo / saídas locais
+nfse.xml
+
+build/
+tests/fixtures/
+
 *.pfx
 
 # Arquivos de ambiente
