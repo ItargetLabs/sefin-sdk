@@ -20,6 +20,14 @@ final class Environment
         );
     }
 
+    public static function production(): self
+    {
+        return new self(
+            'http://sefin.nfse.gov.br/SefinNacional/',
+            EnvironmentType::PRODUCTION
+        );
+    }
+
     public static function custom(string $apiUrl, EnvironmentType $type = EnvironmentType::HOMOLOGATION): self
     {
         return new self(rtrim($apiUrl, '/') . '/', $type);
