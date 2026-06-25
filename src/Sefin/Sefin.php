@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use SefinSdk\Config\CertificateConfig;
 use SefinSdk\Config\Environment;
 use SefinSdk\Dto\DpsLookupResponse;
+use SefinSdk\Dto\EventListResponse;
 use SefinSdk\Dto\EventResponse;
 use SefinSdk\Dto\NfseBypassRequest;
 use SefinSdk\Dto\NfseLookupResponse;
@@ -17,6 +18,8 @@ use SefinSdk\Dto\RegisterEventRequest;
 use SefinSdk\Http\NfseClient;
 use SefinSdk\Support\DpsXmlFactory;
 use SefinSdk\Support\DpsXmlSigner;
+use SefinSdk\Support\EventXmlFactory;
+use SefinSdk\Support\EventXmlSigner;
 
 final class Sefin
 {
@@ -120,6 +123,49 @@ final class Sefin
     public function registerEvent(string $chaveAcesso, RegisterEventRequest $request): EventResponse
     {
         return $this->client()->registerEvent($chaveAcesso, $request);
+    }
+
+    /**
+     * Cancela uma NFS-e emitindo um evento de cancelamento.
+     *
+     * Monta o XML de pedido de cancelamento, assina com o certificado do cliente
+     * e submete para a SEFIN.
+     *
+     * @param array<string, mixed> $params {
+     *   chNFSe: string,        // chave de acesso da NFS-e a cancelar (50 chars)
+     *   cMotCancNFSe: string,  // 1=Erro na emissão, 2=Serviço não prestado, 3=Duplicidade, 4=Outros
+     *   xMotCancNFSe?: string, // obrigatório quando cMotCancNFSe = 4
+     *   nSeqEvento?: int,      // número sequencial do evento (padrão: 1)
+     * }
+     */
+    public function cancelNfse(string $chaveAcesso, array $params): EventResponse
+    {
+        $params['chNFSe'] = $chaveAcesso;
+
+        $eventXml = EventXmlFactory::forCancellation($params);
+
+        $privateKeyPath = $this->certificateConfig->getPrivateKeyPath();
+        if ($privateKeyPath === null || trim($privateKeyPath) === '') {
+            throw new \SefinSdk\Exception\ValidationException('privateKeyPath is required to sign event XML.');
+        }
+
+        $certPem = self::extractPemBlock((string) file_get_contents($this->certificateConfig->getCertificatePath()), 'CERTIFICATE');
+        $keyPem = self::extractAnyPrivateKeyPem((string) file_get_contents($privateKeyPath));
+        $password = $this->certificateConfig->getPrivateKeyPassword();
+
+        $eventXmlSigned = EventXmlSigner::signInfPedReg($eventXml, $keyPem, $certPem, $password);
+
+        return $this->registerEvent($chaveAcesso, RegisterEventRequest::fromXml($eventXmlSigned));
+    }
+
+    /**
+     * Retorna todos os eventos vinculados a uma NFS-e pela sua chave de acesso.
+     *
+     * GET /nfse/{chaveAcesso}/eventos
+     */
+    public function getEventsByAccessKey(string $chaveAcesso): EventListResponse
+    {
+        return $this->client()->getEventsByAccessKey($chaveAcesso);
     }
 
     public function getEvent(string $chaveAcesso, int $tipoEvento, int $numSeqEvento): EventResponse

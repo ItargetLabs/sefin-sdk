@@ -270,11 +270,52 @@
       }
     },
     "/nfse/{chaveAcesso}/eventos": {
+      "get": {
+        "tags": [
+          "Eventos"
+        ],
+        "summary": "Retorna todos os eventos vinculados à chave de acesso de NFS-e informada",
+        "operationId": "Eventos_GetByChaveAcesso",
+        "consumes": [],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "chaveAcesso",
+            "in": "path",
+            "description": "Chave de acesso da NFS-e (50 posições)",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eventos encontrados para a NFS-e",
+            "schema": {
+              "$ref": "#/definitions/EventosGetListResponseSucesso"
+            }
+          },
+          "401": {
+            "description": "Usuário não tem permissão para acessar os eventos",
+            "schema": {
+              "$ref": "#/definitions/ResponseErro"
+            }
+          },
+          "404": {
+            "description": "Nenhum evento encontrado para a NFS-e",
+            "schema": {
+              "$ref": "#/definitions/ResponseErro"
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Eventos"
         ],
-        "summary": "Recepciona a DPS e Gera a NFS-e de forma síncrona",
+        "summary": "Registra um evento vinculado a uma NFS-e (ex: cancelamento)",
+        "description": "Recebe o pedido de registro de evento no formato XML compactado em gzip+base64 e registra o evento para a NFS-e correspondente à chave de acesso informada.",
         "operationId": "Eventos_Post",
         "consumes": [
           "application/json"
@@ -284,19 +325,20 @@
         ],
         "parameters": [
           {
+            "name": "chaveAcesso",
+            "in": "path",
+            "description": "Chave de acesso da NFS-e (50 posições)",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "eventosPostRequest",
             "in": "body",
-            "description": "Estrutura contendo o pedido de registro de evento compactado\r\n            no padrão GZip com representação base64binary",
+            "description": "Pedido de registro de evento no formato XML compactado no padrão gZip com representação base64binary",
             "required": true,
             "schema": {
               "$ref": "#/definitions/EventosPostRequest"
             }
-          },
-          {
-            "name": "chaveAcesso",
-            "in": "path",
-            "required": true,
-            "type": "string"
           }
         ],
         "responses": {
@@ -314,6 +356,12 @@
           },
           "401": {
             "description": "Usuário não tem permissão para acessar os eventos",
+            "schema": {
+              "$ref": "#/definitions/ResponseErro"
+            }
+          },
+          "422": {
+            "description": "A requisição violou alguma regra de negócio",
             "schema": {
               "$ref": "#/definitions/ResponseErro"
             }
@@ -492,6 +540,41 @@
         },
         "complemento": {
           "type": "string"
+        }
+      }
+    },
+    "EventosGetListResponseSucesso": {
+      "description": "Resposta da consulta de todos os eventos vinculados a uma NFS-e pela chave de acesso",
+      "required": [
+        "tipoAmbiente",
+        "versaoAplicativo",
+        "dataHoraProcessamento",
+        "eventos"
+      ],
+      "type": "object",
+      "properties": {
+        "tipoAmbiente": {
+          "format": "int32",
+          "description": "Tipo de ambiente (1-Produção | 2-Homologação)",
+          "enum": [1, 2],
+          "type": "integer"
+        },
+        "versaoAplicativo": {
+          "description": "Versão do aplicativo que processou a requisição",
+          "type": "string"
+        },
+        "dataHoraProcessamento": {
+          "format": "date-time",
+          "description": "Data e hora de processamento da requisição",
+          "type": "string",
+          "example": "2026-04-23T14:44:24.4325989-03:00"
+        },
+        "eventos": {
+          "description": "Lista de eventos vinculados à NFS-e",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EventosPostResponseSucesso"
+          }
         }
       }
     },

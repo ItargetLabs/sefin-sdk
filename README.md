@@ -208,6 +208,180 @@ echo $pdf;
 
 Opcionalmente é possível injetar uma instância de `DanfseConfig` da biblioteca `danfse-nacional` no construtor de `DanfsePdfGenerator` para ajustes avançados de layout.
 
+## Consultar todos os eventos de uma NFS-e
+
+Use `getEventsByAccessKey()` para buscar todos os eventos vinculados a uma NFS-e pela chave de acesso:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use SefinSdk\Config\CertificateConfig;
+use SefinSdk\Config\Environment;
+use SefinSdk\Sefin;
+
+require __DIR__ . '/vendor/autoload.php';
+
+$sdk = new Sefin(
+    Environment::restrictedProduction(),
+    new CertificateConfig(
+        certificatePath: __DIR__ . '/certs/client.pem',
+        privateKeyPath:  __DIR__ . '/certs/client.key',
+        privateKeyPassword: 'senha-do-certificado'
+    )
+);
+
+$chaveAcesso = '31062002250516724000160000000000002126046985535602';
+
+// GET /nfse/{chaveAcesso}/eventos
+$response = $sdk->getEventsByAccessKey($chaveAcesso);
+
+echo "Processado em: " . $response->dataHoraProcessamento->format('d/m/Y H:i:s') . PHP_EOL;
+echo "Total de eventos: " . count($response->eventos) . PHP_EOL;
+
+foreach ($response->eventos as $evento) {
+    // decodedXml() descompacta o gzip+base64 e retorna o XML do evento
+    echo $evento->decodedXml();
+}
+```
+
+> Para buscar um evento específico pelo tipo e número sequencial, use `getEvent($chaveAcesso, $tipoEvento, $numSeqEvento)`.
+
+## Cancelamento de NFS-e
+
+### Forma simplificada (recomendada)
+
+Use `cancelNfse()`. A SDK cuida de montar o XML, assinar com seu certificado e enviar para a SEFIN automaticamente:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use SefinSdk\Config\CertificateConfig;
+use SefinSdk\Config\Environment;
+use SefinSdk\Sefin;
+
+require __DIR__ . '/vendor/autoload.php';
+
+$sdk = new Sefin(
+    Environment::restrictedProduction(),
+    new CertificateConfig(
+        certificatePath: __DIR__ . '/certs/client.pem',
+        privateKeyPath:  __DIR__ . '/certs/client.key',
+        privateKeyPassword: 'senha-do-certificado' // null se a chave não for protegida por senha
+    )
+);
+
+// Chave de acesso da NFS-e que você quer cancelar (50 caracteres).
+$chaveAcesso = '31062002250516724000160000000000002126046985535602';
+
+$response = $sdk->cancelNfse(
+    chaveAcesso: $chaveAcesso,
+    params: [
+        'cMotCancNFSe' => '1',
+        // Códigos aceitos:
+        //   1 = Erro na emissão
+        //   2 = Serviço não prestado
+        //   3 = Duplicidade de NFS-e
+        //   4 = Outros → neste caso, 'xMotCancNFSe' passa a ser obrigatório
+
+        // 'xMotCancNFSe' => 'Descrição detalhada do motivo', // obrigatório quando cMotCancNFSe = 4
+        // 'nSeqEvento'   => 1,  // número sequencial do evento; padrão: 1
+    ]
+);
+
+// O XML do evento registrado e autorizado pela SEFIN (descompactado):
+echo $response->decodedXml();
+```
+
+---
+
+### Forma manual (controle total)
+
+Caso precise inspecionar ou manipular o XML antes de enviar, use as classes de suporte diretamente:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use SefinSdk\Config\CertificateConfig;
+use SefinSdk\Config\Environment;
+use SefinSdk\Dto\RegisterEventRequest;
+use SefinSdk\Sefin;
+use SefinSdk\Support\EventXmlFactory;
+use SefinSdk\Support\EventXmlSigner;
+
+require __DIR__ . '/vendor/autoload.php';
+
+// ─── 1. Parâmetros ──────────────────────────────────────────────────────────
+
+$chaveAcesso   = '31062002250516724000160000000000002126046985535602';
+$certPath      = __DIR__ . '/certs/client.pem';
+$keyPath       = __DIR__ . '/certs/client.key';
+$keyPassword   = 'senha-do-certificado'; // null se a chave não for protegida por senha
+
+// ─── 2. Montar o XML de pedido de cancelamento ──────────────────────────────
+
+$eventXml = EventXmlFactory::forCancellation([
+    'chNFSe'       => $chaveAcesso, // chave da NFS-e a cancelar
+    'cMotCancNFSe' => '1',          // motivo do cancelamento (veja lista acima)
+    // 'xMotCancNFSe' => 'Detalhe do motivo', // obrigatório quando cMotCancNFSe = 4
+    // 'nSeqEvento'   => 1,                   // padrão: 1
+]);
+
+// Neste ponto $eventXml é um XML não assinado, por exemplo:
+//
+// <pedRegEvento versao="1.00" xmlns="http://www.sped.fazenda.gov.br/nfse">
+//   <infPedReg Id="PRE31062002250516724000160000000000002126046985535602">
+//     <chNFSe>31062002250516724000160000000000002126046985535602</chNFSe>
+//     <tpEvento>1</tpEvento>
+//     <nSeqEvento>1</nSeqEvento>
+//     <verEvento>1.00</verEvento>
+//     <detEvento versao="1.00">
+//       <descEvento>Cancelamento NFS-e</descEvento>
+//       <cMotCancNFSe>1</cMotCancNFSe>
+//     </detEvento>
+//   </infPedReg>
+// </pedRegEvento>
+
+// ─── 3. Assinar o XML com o certificado do emitente ─────────────────────────
+
+// Lê os arquivos de certificado e chave privada.
+$certPem = file_get_contents($certPath);
+$keyPem  = file_get_contents($keyPath);
+
+// Assina o elemento <infPedReg> com RSA-SHA1 (padrão SEFIN).
+// A assinatura é inserida como filho direto de <pedRegEvento>.
+$eventXmlSigned = EventXmlSigner::signInfPedReg(
+    eventXml:          $eventXml,
+    privateKeyPem:     $keyPem,
+    certificatePem:    $certPem,
+    privateKeyPassword: $keyPassword // null se a chave não for protegida por senha
+);
+
+// ─── 4. Empacotar e enviar para a SEFIN ─────────────────────────────────────
+
+// RegisterEventRequest comprime o XML em gzip+base64 conforme o contrato da API.
+$request = RegisterEventRequest::fromXml($eventXmlSigned);
+
+$sdk = new Sefin(
+    Environment::restrictedProduction(),
+    new CertificateConfig($certPath, $keyPath, $keyPassword)
+);
+
+// Envia para POST /nfse/{chaveAcesso}/eventos
+$response = $sdk->registerEvent($chaveAcesso, $request);
+
+// ─── 5. Tratar a resposta ───────────────────────────────────────────────────
+
+echo "Evento registrado em: " . $response->dataHoraProcessamento->format('d/m/Y H:i:s') . PHP_EOL;
+echo "XML do evento autorizado:" . PHP_EOL;
+echo $response->decodedXml();
+```
+
 ## Testes
 
 ```bash

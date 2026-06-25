@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use SefinSdk\Config\CertificateConfig;
 use SefinSdk\Config\Environment;
 use SefinSdk\Dto\DpsLookupResponse;
+use SefinSdk\Dto\EventListResponse;
 use SefinSdk\Dto\EventResponse;
 use SefinSdk\Dto\NfseBypassRequest;
 use SefinSdk\Dto\NfseLookupResponse;
@@ -80,6 +81,16 @@ final class NfseClient extends SefinBaseClient
             '/nfse/' . rawurlencode($chaveAcesso) . '/eventos',
             ['json' => $request->toArray()],
             201
+        ));
+    }
+
+    public function getEventsByAccessKey(string $chaveAcesso): EventListResponse
+    {
+        $this->assertNotEmpty($chaveAcesso, 'chaveAcesso');
+
+        return EventListResponse::fromArray($this->request(
+            'GET',
+            '/nfse/' . rawurlencode($chaveAcesso) . '/eventos'
         ));
     }
 
