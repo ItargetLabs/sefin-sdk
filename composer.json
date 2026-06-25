@@ -2,7 +2,7 @@
   "name": "devsitarget/sdk-sefin-nfse-php",
   "description": "SDK PHP para integração com a API NFS-e da SEFIN Nacional",
   "type": "library",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "license": "MIT",
   "require": {
     "php": ">=8.2",

@@ -19,6 +19,7 @@ final class DpsXmlFactory
      * - infDPS:
      *   - Id (string) ou será derivado de cLocEmi + prest + serie + nDPS
      *   - tpAmb (1|2), dhEmi (ISO8601), verAplic, serie, nDPS, dCompet (YYYY-MM-DD), tpEmit, cLocEmi
+     *   - subst?: { chSubstda (50 chars), cMotivo (1|2|3|4|5|99), xMotivo? (15-255 chars, obrigatório quando cMotivo=99) }
      *   - prest: { CNPJ|CPF, email?, regTrib: { opSimpNac, regEspTrib } }
      *   - toma?: { CNPJ|CPF, xNome?, end?: { endNac?: { cMun?, CEP? }, xLgr?, nro?, xCpl?, xBairro? }, fone?, email? }
      *   - serv: { locPrest: { cLocPrestacao }, cServ: { cTribNac, cTribMun?, xDescServ } }
@@ -85,6 +86,11 @@ final class DpsXmlFactory
         self::appendText($doc, $infDps, 'tpEmit', $tpEmit);
         self::appendText($doc, $infDps, 'cLocEmi', $cLocEmi);
 
+        $subst = is_array($inf['subst'] ?? null) ? $inf['subst'] : null;
+        if ($subst !== null) {
+            self::appendSubst($doc, $infDps, $subst);
+        }
+
         self::appendPrest($doc, $infDps, $prest);
 
         $toma = is_array($inf['toma'] ?? null) ? $inf['toma'] : null;
@@ -137,6 +143,52 @@ final class DpsXmlFactory
         $el = $doc->createElementNS(self::NFSE_NS, $name);
         $el->appendChild($doc->createTextNode($value));
         $parent->appendChild($el);
+    }
+
+    /**
+     * Códigos de motivo válidos para substituição de NFS-e:
+     * 1 = Desenquadramento de NFS-e do Simples Nacional
+     * 2 = Enquadramento de NFS-e no Simples Nacional
+     * 3 = Inclusão Retroativa de Imunidade/Isenção para NFS-e
+     * 4 = Exclusão Retroativa de Imunidade/Isenção para NFS-e
+     * 5 = Rejeição de NFS-e pelo tomador ou pelo intermediário
+     * 99 = Outros (xMotivo obrigatório)
+     *
+     * @param array<string, mixed> $subst
+     */
+    private static function appendSubst(DOMDocument $doc, DOMElement $infDps, array $subst): void
+    {
+        $chSubstda = (string) ($subst['chSubstda'] ?? '');
+        if (trim($chSubstda) === '') {
+            throw new ValidationException('subst.chSubstda is required.');
+        }
+
+        $cMotivo = (string) ($subst['cMotivo'] ?? '');
+        if (trim($cMotivo) === '') {
+            throw new ValidationException('subst.cMotivo is required.');
+        }
+
+        $validMotivos = ['1', '2', '3', '4', '5', '99'];
+        if (!in_array($cMotivo, $validMotivos, true)) {
+            throw new ValidationException(
+                sprintf('subst.cMotivo "%s" is invalid. Allowed values: %s.', $cMotivo, implode(', ', $validMotivos))
+            );
+        }
+
+        $xMotivo = (string) ($subst['xMotivo'] ?? '');
+        if ($cMotivo === '99' && trim($xMotivo) === '') {
+            throw new ValidationException('subst.xMotivo is required when subst.cMotivo is 99.');
+        }
+
+        $substEl = $doc->createElementNS(self::NFSE_NS, 'subst');
+        $infDps->appendChild($substEl);
+
+        self::appendText($doc, $substEl, 'chSubstda', $chSubstda);
+        self::appendText($doc, $substEl, 'cMotivo', $cMotivo);
+
+        if (trim($xMotivo) !== '') {
+            self::appendText($doc, $substEl, 'xMotivo', $xMotivo);
+        }
     }
 
     /**

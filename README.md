@@ -154,6 +154,36 @@ $response = $sdk->submitNfseFromArray($payload);
 echo $response->chaveAcesso;
 ```
 
+## Substituição de NFS-e
+
+Para emitir uma NFS-e em substituição a outra já autorizada, inclua o campo `subst` dentro de `infDPS`, antes de `prest`:
+
+```php
+$payload = [
+    'infDPS' => [
+        // ... campos normais (tpAmb, dhEmi, serie, nDPS, etc.) ...
+
+        'subst' => [
+            'chSubstda' => '31062002250516724000160000000000002126046985535602', // chave da NFS-e a ser substituída
+            'cMotivo'   => '1',  // 1 = Desenquadramento de NFS-e do Simples Nacional
+                                 // 2 = Enquadramento de NFS-e no Simples Nacional
+                                 // 3 = Inclusão Retroativa de Imunidade/Isenção
+                                 // 4 = Exclusão Retroativa de Imunidade/Isenção
+                                 // 5 = Rejeição de NFS-e pelo tomador/intermediário
+                                 // 99 = Outros (xMotivo obrigatório)
+            // 'xMotivo' => 'Descrição do motivo', // obrigatório apenas quando cMotivo = 99
+        ],
+
+        'prest' => [ /* ... */ ],
+        // ...
+    ],
+];
+
+$response = $sdk->submitNfseFromArray($payload);
+```
+
+> O campo `subst` é opcional (`0-1`). Quando `cMotivo = 99`, o campo `xMotivo` torna-se obrigatório (entre 15 e 255 caracteres).
+
 ## DANFSe em PDF (XML → PDF)
 
 Para gerar o documento auxiliar da NFS-e em PDF a partir do XML retornado pela SEFIN (ou de um arquivo salvo), use `DanfsePdfGenerator`. A SDK normaliza o XML quando necessário para compatibilidade com o gerador (por exemplo, ajustes no bloco `totTrib`).
