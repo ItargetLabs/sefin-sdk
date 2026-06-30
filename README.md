@@ -154,6 +154,41 @@ $response = $sdk->submitNfseFromArray($payload);
 echo $response->chaveAcesso;
 ```
 
+## Atividade/Evento (`atvEvento`)
+
+Quando o `cTribNac` pertence ao **item 12** da LC 116/2003 (códigos que começam com `12`, como `120801` — feiras, exposições, congressos etc.), a SEFIN exige o grupo `serv/atvEvento`. Sem ele, a emissão é rejeitada com o erro **E0390**.
+
+Inclua `atvEvento` dentro de `serv` no payload de `submitNfseFromArray()`:
+
+```php
+'serv' => [
+    'locPrest' => ['cLocPrestacao' => '3304557'],
+    'cServ' => [
+        'cTribNac' => '120801',
+        'cTribMun' => '001',
+        'xDescServ' => 'INSCRIÇÃO PARA O 58° CONGRESSO BRASILEIRO DE PATOLOGIA CLÍNICA',
+    ],
+    'atvEvento' => [
+        'xNome' => '58° CONGRESSO BRASILEIRO DE PATOLOGIA CLÍNICA',
+        'dtIni' => '2026-09-01',
+        'dtFim' => '2026-09-05',
+
+        // Opção A: código do evento na Administração Tributária Municipal
+        // 'idAtvEvt' => 'CODIGO-DO-EVENTO',
+
+        // Opção B: endereço do evento (mutuamente exclusivo com idAtvEvt)
+        'end' => [
+            'CEP' => '20040020',
+            'xLgr' => 'Av. Churchill',
+            'nro' => '94',
+            'xBairro' => 'Centro',
+        ],
+    ],
+],
+```
+
+> **Regras:** `xNome`, `dtIni` e `dtFim` são obrigatórios. Informe **`idAtvEvt`** ou **`end`**, nunca os dois. Ao usar `end`, o CEP deve pertencer ao município de `cLocPrestacao` (regra **E0398**). Para eventos no exterior, use `end.endExt` em vez de `CEP`.
+
 ## Substituição de NFS-e
 
 Para emitir uma NFS-e em substituição a outra já autorizada, inclua o campo `subst` dentro de `infDPS`, antes de `prest`:

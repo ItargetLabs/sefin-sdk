@@ -22,7 +22,7 @@ final class DpsXmlFactory
      *   - subst?: { chSubstda (50 chars), cMotivo (1|2|3|4|5|99), xMotivo? (15-255 chars, obrigatório quando cMotivo=99) }
      *   - prest: { CNPJ|CPF, email?, regTrib: { opSimpNac, regEspTrib } }
      *   - toma?: { CNPJ|CPF, xNome?, end?: { endNac?: { cMun?, CEP? }, xLgr?, nro?, xCpl?, xBairro? }, fone?, email? }
-     *   - serv: { locPrest: { cLocPrestacao }, cServ: { cTribNac, cTribMun?, xDescServ } }
+     *   - serv: { locPrest: { cLocPrestacao }, cServ: { cTribNac, cTribMun?, xDescServ }, atvEvento?: { xNome, dtIni, dtFim, idAtvEvt?|end?: { CEP?|endExt?: { cEndPost, xCidade, xEstProvReg }, xLgr, nro, xCpl?, xBairro } } }
      *   - valores: { vServPrest: { vServ }, trib: { tribMun: { tribISSQN, tpRetISSQN }, totTrib?: { vTotTrib?: { vTotTribFed, vTotTribEst, vTotTribMun } } } }
      *
      * @param array<string, mixed> $payload
@@ -311,6 +311,103 @@ final class DpsXmlFactory
             self::appendText($doc, $cServEl, 'cTribMun', $cTribMun);
         }
         self::appendText($doc, $cServEl, 'xDescServ', (string) ($cServ['xDescServ'] ?? ''));
+
+        $atvEvento = is_array($serv['atvEvento'] ?? null) ? $serv['atvEvento'] : null;
+        if ($atvEvento !== null) {
+            self::appendAtvEvento($doc, $servEl, $atvEvento);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $atvEvento
+     */
+    private static function appendAtvEvento(DOMDocument $doc, DOMElement $servEl, array $atvEvento): void
+    {
+        $xNome = (string) ($atvEvento['xNome'] ?? '');
+        $dtIni = (string) ($atvEvento['dtIni'] ?? '');
+        $dtFim = (string) ($atvEvento['dtFim'] ?? '');
+
+        foreach (['xNome' => $xNome, 'dtIni' => $dtIni, 'dtFim' => $dtFim] as $field => $value) {
+            if (trim($value) === '') {
+                throw new ValidationException(sprintf('serv.atvEvento.%s is required.', $field));
+            }
+        }
+
+        $idAtvEvt = (string) ($atvEvento['idAtvEvt'] ?? '');
+        $end = is_array($atvEvento['end'] ?? null) ? $atvEvento['end'] : null;
+        $hasIdAtvEvt = trim($idAtvEvt) !== '';
+        $hasEnd = $end !== null;
+
+        if (!$hasIdAtvEvt && !$hasEnd) {
+            throw new ValidationException('serv.atvEvento.idAtvEvt or serv.atvEvento.end is required.');
+        }
+
+        if ($hasIdAtvEvt && $hasEnd) {
+            throw new ValidationException('serv.atvEvento.idAtvEvt and serv.atvEvento.end are mutually exclusive.');
+        }
+
+        $atvEventoEl = $doc->createElementNS(self::NFSE_NS, 'atvEvento');
+        $servEl->appendChild($atvEventoEl);
+
+        self::appendText($doc, $atvEventoEl, 'xNome', $xNome);
+        self::appendText($doc, $atvEventoEl, 'dtIni', $dtIni);
+        self::appendText($doc, $atvEventoEl, 'dtFim', $dtFim);
+
+        if ($hasIdAtvEvt) {
+            self::appendText($doc, $atvEventoEl, 'idAtvEvt', $idAtvEvt);
+            return;
+        }
+
+        self::appendEventoEnd($doc, $atvEventoEl, $end ?? []);
+    }
+
+    /**
+     * @param array<string, mixed> $end
+     */
+    private static function appendEventoEnd(DOMDocument $doc, DOMElement $parent, array $end): void
+    {
+        $cep = (string) ($end['CEP'] ?? '');
+        $endExt = is_array($end['endExt'] ?? null) ? $end['endExt'] : null;
+        $hasCep = trim($cep) !== '';
+        $hasEndExt = $endExt !== null;
+
+        if (!$hasCep && !$hasEndExt) {
+            throw new ValidationException('serv.atvEvento.end.CEP or serv.atvEvento.end.endExt is required.');
+        }
+
+        if ($hasCep && $hasEndExt) {
+            throw new ValidationException('serv.atvEvento.end.CEP and serv.atvEvento.end.endExt are mutually exclusive.');
+        }
+
+        foreach (['xLgr', 'nro', 'xBairro'] as $field) {
+            if (trim((string) ($end[$field] ?? '')) === '') {
+                throw new ValidationException(sprintf('serv.atvEvento.end.%s is required.', $field));
+            }
+        }
+
+        $endEl = $doc->createElementNS(self::NFSE_NS, 'end');
+        $parent->appendChild($endEl);
+
+        if ($hasCep) {
+            self::appendText($doc, $endEl, 'CEP', $cep);
+        } else {
+            $endExtEl = $doc->createElementNS(self::NFSE_NS, 'endExt');
+            $endEl->appendChild($endExtEl);
+            foreach (['cEndPost', 'xCidade', 'xEstProvReg'] as $field) {
+                $v = (string) ($endExt[$field] ?? '');
+                if (trim($v) === '') {
+                    throw new ValidationException(sprintf('serv.atvEvento.end.endExt.%s is required.', $field));
+                }
+                self::appendText($doc, $endExtEl, $field, $v);
+            }
+        }
+
+        foreach (['xLgr', 'nro', 'xCpl', 'xBairro'] as $field) {
+            $v = (string) ($end[$field] ?? '');
+            if (trim($v) !== '') {
+                self::appendText($doc, $endEl, $field, $v);
+            }
+        }
     }
 
     /**
