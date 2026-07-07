@@ -285,9 +285,11 @@ foreach ($response->eventos as $evento) {
 
 ## Cancelamento de NFS-e
 
+O cancelamento usa o **layout de eventos v1.01** (Anexo II SEFIN/ADN). A SDK monta o XML conforme o schema atual da SEFIN, incluindo o `Id` no formato `PRE` + chave (50) + tipo de evento (`101101`).
+
 ### Forma simplificada (recomendada)
 
-Use `cancelNfse()`. A SDK cuida de montar o XML, assinar com seu certificado e enviar para a SEFIN automaticamente:
+Use `cancelNfse()`. A SDK monta o XML, extrai o CNPJ/CPF do certificado, assina e envia para a SEFIN:
 
 ```php
 <?php
@@ -315,21 +317,32 @@ $chaveAcesso = '31062002250516724000160000000000002126046985535602';
 $response = $sdk->cancelNfse(
     chaveAcesso: $chaveAcesso,
     params: [
-        'cMotCancNFSe' => '1',
+        'cMotivo' => '1',
         // Códigos aceitos:
         //   1 = Erro na emissão
         //   2 = Serviço não prestado
-        //   3 = Duplicidade de NFS-e
-        //   4 = Outros → neste caso, 'xMotCancNFSe' passa a ser obrigatório
+        //   9 = Outros → neste caso, 'xMotivo' passa a ser obrigatório (15-255 chars)
 
-        // 'xMotCancNFSe' => 'Descrição detalhada do motivo', // obrigatório quando cMotCancNFSe = 4
-        // 'nSeqEvento'   => 1,  // número sequencial do evento; padrão: 1
+        // 'xMotivo' => 'Descrição detalhada do motivo do cancelamento.', // obrigatório quando cMotivo = 9
     ]
 );
 
 // O XML do evento registrado e autorizado pela SEFIN (descompactado):
 echo $response->decodedXml();
 ```
+
+Campos preenchidos automaticamente por `cancelNfse()` quando omitidos:
+
+| Campo | Padrão |
+|-------|--------|
+| `tpAmb` | ambiente configurado na SDK (`Environment`) |
+| `verAplic` | `sefin-sdk` |
+| `dhEvento` | data/hora atual (`America/Sao_Paulo`) |
+| `CNPJAutor` / `CPFAutor` | extraído do certificado digital |
+
+> **Aliases legados:** `cMotCancNFSe` e `xMotCancNFSe` ainda são aceitos. O valor `4` em `cMotCancNFSe` é mapeado para `cMotivo = 9`. O motivo `3` (Duplicidade) não existe mais no layout v1.01 — use `9` com `xMotivo`.
+
+> Para consultar o evento registrado, use `getEvent($chaveAcesso, 101101, $numSeqEvento)`.
 
 ---
 
@@ -361,24 +374,29 @@ $keyPassword   = 'senha-do-certificado'; // null se a chave não for protegida p
 // ─── 2. Montar o XML de pedido de cancelamento ──────────────────────────────
 
 $eventXml = EventXmlFactory::forCancellation([
-    'chNFSe'       => $chaveAcesso, // chave da NFS-e a cancelar
-    'cMotCancNFSe' => '1',          // motivo do cancelamento (veja lista acima)
-    // 'xMotCancNFSe' => 'Detalhe do motivo', // obrigatório quando cMotCancNFSe = 4
-    // 'nSeqEvento'   => 1,                   // padrão: 1
+    'tpAmb'      => '2',                              // 1=Produção, 2=Homologação
+    'verAplic'   => 'meu-sistema/1.0',
+    'dhEvento'   => '2026-07-07T09:30:00-03:00',
+    'CNPJAutor'  => '12345678000190',                 // ou CPFAutor
+    'chNFSe'     => $chaveAcesso,
+    'cMotivo'    => '1',                              // 1, 2 ou 9
+    // 'xMotivo' => 'Descrição do motivo...',         // obrigatório quando cMotivo = 9 (15-255 chars)
 ]);
 
 // Neste ponto $eventXml é um XML não assinado, por exemplo:
 //
 // <pedRegEvento versao="1.00" xmlns="http://www.sped.fazenda.gov.br/nfse">
-//   <infPedReg Id="PRE31062002250516724000160000000000002126046985535602">
+//   <infPedReg Id="PRE31062002250516724000160000000000002126046985535602101101">
+//     <tpAmb>2</tpAmb>
+//     <verAplic>meu-sistema/1.0</verAplic>
+//     <dhEvento>2026-07-07T09:30:00-03:00</dhEvento>
+//     <CNPJAutor>12345678000190</CNPJAutor>
 //     <chNFSe>31062002250516724000160000000000002126046985535602</chNFSe>
-//     <tpEvento>1</tpEvento>
-//     <nSeqEvento>1</nSeqEvento>
-//     <verEvento>1.00</verEvento>
-//     <detEvento versao="1.00">
-//       <descEvento>Cancelamento NFS-e</descEvento>
-//       <cMotCancNFSe>1</cMotCancNFSe>
-//     </detEvento>
+//     <e101101>
+//       <xDesc>Cancelamento de NFS-e</xDesc>
+//       <cMotivo>1</cMotivo>
+//       <xMotivo>Erro na emissão da NFS-e.</xMotivo>
+//     </e101101>
 //   </infPedReg>
 // </pedRegEvento>
 

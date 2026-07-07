@@ -16,6 +16,7 @@ use SefinSdk\Dto\NfseSubmissionRequest;
 use SefinSdk\Dto\NfseSuccessResponse;
 use SefinSdk\Dto\RegisterEventRequest;
 use SefinSdk\Http\NfseClient;
+use SefinSdk\Support\CertificateSubjectExtractor;
 use SefinSdk\Support\DpsXmlFactory;
 use SefinSdk\Support\DpsXmlSigner;
 use SefinSdk\Support\EventXmlFactory;
@@ -132,15 +133,41 @@ final class Sefin
      * e submete para a SEFIN.
      *
      * @param array<string, mixed> $params {
-     *   chNFSe: string,        // chave de acesso da NFS-e a cancelar (50 chars)
-     *   cMotCancNFSe: string,  // 1=Erro na emissão, 2=Serviço não prestado, 3=Duplicidade, 4=Outros
-     *   xMotCancNFSe?: string, // obrigatório quando cMotCancNFSe = 4
-     *   nSeqEvento?: int,      // número sequencial do evento (padrão: 1)
+     *   cMotivo: string,       // 1=Erro na emissão, 2=Serviço não prestado, 9=Outros
+     *   xMotivo?: string,      // 15-255 chars; obrigatório quando cMotivo=9
+     *   tpAmb?: int|string,    // padrão: ambiente configurado na SDK
+     *   verAplic?: string,     // padrão: sefin-sdk
+     *   dhEvento?: string,     // padrão: data/hora atual (America/Sao_Paulo)
+     *   CNPJAutor?: string,    // padrão: extraído do certificado
+     *   CPFAutor?: string,     // padrão: extraído do certificado
+     *   cMotCancNFSe?: string, // alias legado de cMotivo (4 => 9)
+     *   xMotCancNFSe?: string, // alias legado de xMotivo
      * }
      */
     public function cancelNfse(string $chaveAcesso, array $params): EventResponse
     {
         $params['chNFSe'] = $chaveAcesso;
+        $params['tpAmb'] ??= (string) $this->environment->getType()->value;
+        $params['verAplic'] ??= 'sefin-sdk';
+        $params['dhEvento'] ??= (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))
+            ->format('Y-m-d\TH:i:sP');
+
+        if (!isset($params['CNPJAutor']) && !isset($params['CPFAutor'])) {
+            $certPem = self::extractPemBlock(
+                (string) file_get_contents($this->certificateConfig->getCertificatePath()),
+                'CERTIFICATE'
+            );
+            $author = CertificateSubjectExtractor::extract($certPem);
+            if ($author['cnpj'] !== null) {
+                $params['CNPJAutor'] = $author['cnpj'];
+            } elseif ($author['cpf'] !== null) {
+                $params['CPFAutor'] = $author['cpf'];
+            } else {
+                throw new \SefinSdk\Exception\ValidationException(
+                    'CNPJAutor or CPFAutor is required. Unable to extract document from certificate.'
+                );
+            }
+        }
 
         $eventXml = EventXmlFactory::forCancellation($params);
 
