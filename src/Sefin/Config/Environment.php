@@ -23,7 +23,7 @@ final class Environment
     public static function production(): self
     {
         return new self(
-            'http://sefin.nfse.gov.br/SefinNacional/',
+            'https://sefin.nfse.gov.br/SefinNacional/',
             EnvironmentType::PRODUCTION
         );
     }
